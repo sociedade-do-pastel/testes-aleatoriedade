@@ -87,7 +87,8 @@
   "Performs the run test by applying a series of regexes."
   [bit-string]
   (let [zero-matches {:z-1 (runs? bit-string #"(?<=1)01|10$|^01" 2267 2733)
-                      :z-2 (runs? bit-string #"(?<=1)0{2}1|10{2}$|^0{2}1" 1079 1421)-3 (runs? bit-string #"(?<=1)0{3}1|10{3}$|^0{3}1" 502 748)
+                      :z-2 (runs? bit-string #"(?<=1)0{2}1|10{2}$|^0{2}1" 1079 1421)
+                      :z-3 (runs? bit-string #"(?<=1)0{3}1|10{3}$|^0{3}1" 502 748)
                       :z-4 (runs? bit-string #"(?<=1)0{4}1|10{4}$|^0{4}1" 223 402)
                       :z-5 (runs? bit-string #"(?<=1)0{5}1|10{5}$|^0{5}1" 90 223)
                       :z-6+ (runs? bit-string #"(?<=1)0{6,}1|10{6,}$|^0{6,}1" 90 223)}

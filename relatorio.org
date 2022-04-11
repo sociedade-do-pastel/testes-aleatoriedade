@@ -2,6 +2,7 @@
 #+author: Leon Bellini (22218002-8), Guilherme Ormond (222180070-7)
 #+OPTIONS: toc:nil date:nil
 #+property: header-args :tangle aleatorios.clj
+#+LATEX_HEADER: \usepackage[margin=2.5cm]{geometry}
 
 * O problema
 
@@ -18,6 +19,8 @@ Para certos casos em que a conversão de hexadecimal para binário resultou em 1
 
 Este relatório, a planilha de resultados, bem como a base de códigos desenvolvida pode ser encontrada no
 [[https://github.com/sociedade-do-pastel/testes-aleatoriedade][Github]]. 
+
+#+latex: \clearpage
 
 * O procedimento
 

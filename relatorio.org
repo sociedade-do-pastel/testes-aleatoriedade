@@ -1,0 +1,194 @@
+#+title: Testes de aleatoriedade segundo a FIPS 140-1
+#+author: Leon Bellini (22218002-8), Guilherme Ormond (222180070-7)
+#+OPTIONS: toc:nil date:nil
+#+property: header-args :tangle aleatorios.clj
+
+* O problema
+
+Foram fornecidas *26 chaves* em hexadecimal, as quais devem ser testadas quanto a sua possível aleatoriedade segundo os testes especificados pela *FIPS 140-1*. As informações contidas nesse relatório incluem:
+
+1. A quantidade de /monobits/;
+2. O valor calculado pelo /Poker Test/;
+3. Quantidade de cada sequência de bits 0s ou 1s produzida pelo /Runs test/;
+4. Uma tabela compreensível sobre a aprovação ou não de cada teste.
+
+** Algumas considerações
+
+Para certos casos em que a conversão de hexadecimal para binário resultou em 19999 bits, foi adicionado um zero à esquerda, o que certamente influencia certos resultados.
+
+Este relatório, a planilha de resultados, bem como a base de códigos desenvolvida pode ser encontrada no
+[[https://github.com/sociedade-do-pastel/testes-aleatoriedade][Github]]. 
+
+* O procedimento
+
+Primeiramente foram definidas funções para ajuste das strings binárias convertidas com o intuito de deixá-las todas com 20000 dígitos/bits.
+
+#+begin_src clojure :results none
+(defn read-file
+  "Receives a filename, reads a file and returns a vector of hexa strings."
+  [filename]
+  (with-open [reader (clojure.java.io/reader filename)]
+    (reduce (fn
+              [hex-vec line]
+              (let [trimmed-string (clojure.string/replace (clojure.string/trim line) #"'" "")]
+                (if-not (clojure.string/blank? trimmed-string)
+                  (conj hex-vec trimmed-string)
+                  (conj hex-vec)))) [] (line-seq reader))))
+
+(defn transform-into-bitstrings
+  "Transforms a given hexadecimal string into a string of bits."
+  [hexa-vec]
+  (reduce (fn
+            [bit-vec hexa-string]
+            (conj bit-vec (.toString (new java.math.BigInteger hexa-string 16) 2))) [] hexa-vec))
+
+(defn adjust-strings
+  "Adjusts all strings within a given vector to have 20k bits."
+  [bit-vector]
+  (map (fn
+         [bit-string]
+         (if-not (= (count bit-string) 20000)
+           (str "0" bit-string)
+           bit-string)) bit-vector))
+#+end_src
+
+#+latex: \clearpage
+** /Monobit test/
+
+#+begin_src clojure :results none
+(defn check-monobit
+  "Checks if a given count of ones is within a pre-defined boundary."
+  [one-count]
+  {:one-count one-count
+   :passed? (and (> one-count 9654)
+                 (< one-count 10346))})
+
+(defn monobit-test
+  "Checks if a given bitstring passes the monobit test. Returns a hash."
+  [bit-string]
+  (loop [[curr-bit & rest-bits] bit-string one-count 0]
+    (cond
+      (nil? curr-bit) (check-monobit one-count)
+      (= \1 curr-bit) (recur rest-bits (inc one-count))
+      :else (recur rest-bits one-count))))
+#+end_src
+
+#+latex: \clearpage
+
+** /Poker test/
+
+#+begin_src clojure :results none
+(defn check-poker
+  "Does all the logic related to the poker-test."
+  [result]
+  (let [sum (reduce (fn
+                      [value map-t]
+                      (+  (* (nth map-t 1) (nth map-t 1)) value)) 0 result)]
+    (let [partial (- (* sum 16/5000) 5000)]
+      {:result (float partial)
+       :nibbles result
+       :passed? (and (> partial 1.03 )
+                     (< partial 57.4))})))
+
+(defn poker-test
+  "Checks if a string is approved by the poker test"
+  [bit-string]
+  (loop [lower-bound 0 upper-bound 4 results-hash {}]
+    (if-not (> upper-bound (count bit-string))
+      (let [temp-string (subs bit-string lower-bound upper-bound)]
+        (recur (+ lower-bound 4)
+               (+ upper-bound 4)           
+               (assoc results-hash temp-string (inc (results-hash temp-string 0)))))
+      (check-poker results-hash))))
+#+end_src
+
+#+latex: \clearpage
+** Long run test
+
+#+begin_src clojure
+(defn long-run-test
+  [bit-string]
+  {:passed? (if-not (re-find #"1{34}|0{34}" bit-string)
+              true
+              false)})
+#+end_src
+
+** Runs test
+
+#+begin_src clojure
+(defn get-regex-count
+  "Counts the number of regexp matches within a string."
+  [og-string regexp]
+  (count (re-seq regexp og-string)))
+
+(defn runs?
+  "Returns the quantity of runs within a certain range."
+  [og-string regexp lower-bound upper-bound]
+  (let [count (get-regex-count og-string regexp)]
+    {:count count
+     :pass? (and (> count lower-bound)
+                 (< count upper-bound))}))
+
+(defn runs-test
+  "Performs the run test by applying a series of regexes."
+  [bit-string]
+  (let [zero-matches {:z-1 (runs? bit-string #"(?<=1)01|10$|^01" 2267 2733)
+                      :z-2 (runs? bit-string #"(?<=1)0{2}1|10{2}$|^0{2}1" 1079 1421)
+                      :z-3 (runs? bit-string #"(?<=1)0{3}1|10{3}$|^0{3}1" 502 748)
+                      :z-4 (runs? bit-string #"(?<=1)0{4}1|10{4}$|^0{4}1" 223 402)
+                      :z-5 (runs? bit-string #"(?<=1)0{5}1|10{5}$|^0{5}1" 90 223)
+                      :z-6+ (runs? bit-string #"(?<=1)0{6,}1|10{6,}$|^0{6,}1" 90 223)}
+        one-matches {:o-1 (runs? bit-string #"(?<=0)10|01$|^10" 2267 2733)
+                     :o-2 (runs? bit-string #"(?<=0)1{2}0|01{2}$|^1{2}0" 1079 1421)
+                     :o-3 (runs? bit-string #"(?<=0)1{3}0|01{3}$|^1{3}0" 502 748)
+                     :o-4 (runs? bit-string #"(?<=0)1{4}0|01{4}$|^1{4}0" 223 402)
+                     :o-5 (runs? bit-string #"(?<=0)1{5}0|01{5}$|^1{5}0" 90 223)
+                     :o-6+ (runs? bit-string #"(?<=0)1{6,}0|01{6,}$|^1{6,}0" 90 223)}]
+    {:zero-seqs zero-matches
+     :one-seqs one-matches}))
+#+end_src
+
+#+latex: \clearpage
+
+** Resultado Final
+
+Foi  obtido a partir da extração dos valores obtidos a partir da execução da seguinte função:
+
+#+begin_src clojure :results none
+(defn test-all
+  "Tests all strings and exports the final result into /tmp/resultados.txt."
+  [bit-vec]
+  (spit "/tmp/resultados.txt" "\n")
+  (doseq [id (range 1 (inc (count bit-vec)))
+          :let [single-bit-string (nth bit-vec (- id 1))]]
+    (spit "/tmp/resultados.txt"
+          {:id id
+           :monobit (monobit-test single-bit-string)
+           :long-run (long-run-test single-bit-string)}
+          :append true)
+    (spit "/tmp/resultados.txt" "\n" :append true)
+    (spit "/tmp/resultados.txt" (poker-test single-bit-string) :append true)
+    (spit "/tmp/resultados.txt" "\n" :append true)
+    (spit "/tmp/resultados.txt" (runs-test single-bit-string) :append true)
+    (spit "/tmp/resultados.txt" "\n" :append true)))
+
+(defn test-strings
+  []
+  (let [hexa-vec (read-file "keys.txt")]
+    (let [adjusted-bit-vec (adjust-strings (transform-into-bitstrings hexa-vec))]
+      (test-all adjusted-bit-vec))))
+
+(test-strings)
+#+end_src
+
+#+latex: \clearpage
+
+** A tabela obtida
+
+No total foram 13 chaves negadas das 26. Estas falharam em algum momento durante a bateria de testes. Deve-se notar que, para o caso do =run-test=, não houve falha em relação ao valor dos /runs/ de 1.  
+
+[[file:resultados_plan.png]]
+
+*** Os /nibbles/ do /poker test/
+
+[[file:nibbles_plan.png]]

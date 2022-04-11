@@ -1,1 +1,1 @@
-/home/leonino/Repos/testes-aleatoriedade/relatorio.org
+./relatorio.org
